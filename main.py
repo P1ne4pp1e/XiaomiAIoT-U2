@@ -1,6 +1,6 @@
 import os
-
 from devices_manager.e1 import E1DeviceManager
+
 
 # 示例：如何使用E1设备管理器
 def example_usage():
@@ -9,6 +9,10 @@ def example_usage():
 
     # 创建E1设备管理器
     manager = E1DeviceManager()
+
+    # 只扫描总线5
+    buses = manager.buses
+    manager.buses = {5: buses.get(5)} if 5 in buses else {}
 
     # 扫描设备
     manager.scan_devices()
@@ -35,8 +39,8 @@ def example_usage():
             elif index % 3 == 2:
                 manager.set_led_color(0, 0, 60)  # 蓝色
 
-            # 循环设置数码管显示数字
-            manager.display_tube(index % 4, str(index % 10))
+            # 循环设置数码管显示
+            manager.display_tube_string(str(index % 10))
 
             # 等待1秒
             time.sleep(1)

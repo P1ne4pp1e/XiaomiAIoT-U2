@@ -46,20 +46,35 @@ class E1DeviceManager:
             print("未找到I2C总线")
             return
 
-        for bus_num, bus in self.buses.items():
-            # 扫描LED设备
-            for addr in PCA9685.POSSIBLE_ADDRESSES:
-                led = PCA9685(bus, addr)
-                if led.detect() and led.initialize():
-                    self.led_devices[addr] = led
-                    print(f"初始化LED设备: 总线={bus_num}, 地址=0x{addr:02X}")
+        # 只扫描总线5，从测试结果看设备在总线5上
+        bus = self.buses.get(5)
+        if not bus:
+            print("未找到总线5")
+            return
 
-            # 扫描数码管设备
-            for addr in HT16K33.POSSIBLE_ADDRESSES:
+        # 扫描LED设备
+        for addr in PCA9685.POSSIBLE_ADDRESSES:
+            try:
+                led = PCA9685(bus, addr)
+                if led.detect():
+                    if led.initialize():
+                        self.led_devices[addr] = led
+                        print(f"初始化LED设备: 总线=5, 地址=0x{addr:02X}")
+                        break
+            except Exception as e:
+                pass
+
+        # 扫描数码管设备
+        for addr in HT16K33.POSSIBLE_ADDRESSES:
+            try:
                 tube = HT16K33(bus, addr)
-                if tube.detect() and tube.initialize():
-                    self.tube_devices[addr] = tube
-                    print(f"初始化数码管设备: 总线={bus_num}, 地址=0x{addr:02X}")
+                if tube.detect():
+                    if tube.initialize():
+                        self.tube_devices[addr] = tube
+                        print(f"初始化数码管设备: 总线=5, 地址=0x{addr:02X}")
+                        break
+            except Exception as e:
+                pass
 
     def get_led(self, address: int = None) -> Optional[PCA9685]:
         """
@@ -111,16 +126,20 @@ class E1DeviceManager:
             print("未找到LED设备")
             return False
 
-        # 限制颜色值范围
-        red = max(0, min(255, red))
-        green = max(0, min(255, green))
-        blue = max(0, min(255, blue))
+        try:
+            # 限制颜色值范围
+            red = max(0, min(255, red))
+            green = max(0, min(255, green))
+            blue = max(0, min(255, blue))
 
-        # 设置LED颜色
-        on = 0x0f
-        return (led.set_pwm(0, on, on + red * 16) and  # R
-                led.set_pwm(1, on, on + green * 16) and  # G
-                led.set_pwm(2, on, on + blue * 16))  # B
+            # 设置LED颜色
+            on = 0x0f
+            return (led.set_pwm(0, on, on + red * 16) and  # R
+                    led.set_pwm(1, on, on + green * 16) and  # G
+                    led.set_pwm(2, on, on + blue * 16))  # B
+        except Exception as e:
+            print(f"设置LED颜色失败: {e}")
+            return False
 
     def display_tube(self, index: int, char: str, address: int = None) -> bool:
         """
@@ -162,8 +181,12 @@ class E1DeviceManager:
             print("未找到数码管设备")
             return False
 
-        # 显示字符串
-        return tube.display_string(text, align_right)
+        try:
+            # 显示字符串
+            return tube.display_string(text, align_right)
+        except Exception as e:
+            print(f"显示字符串失败: {e}")
+            return False
 
     def close(self) -> None:
         """关闭所有设备"""

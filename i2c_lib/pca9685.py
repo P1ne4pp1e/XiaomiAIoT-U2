@@ -27,27 +27,6 @@ class PCA9685(I2CDevice):
         """
         super().__init__(bus, address)
 
-    def initialize(self) -> bool:
-        """
-        初始化PCA9685
-
-        Returns:
-            bool: 是否成功初始化
-        """
-        if not self.bus or not self.address:
-            print("总线或地址未设置")
-            return False
-
-        # 设置MODE1寄存器
-        if not self.bus.write_byte_data(self.MODE1, 0x00):
-            return False
-
-        # 关闭所有LED
-        self.set_all_pwm(0, 0)
-
-        self.is_initialized = True
-        return True
-
     def detect(self) -> bool:
         """
         检测PCA9685是否存在
@@ -64,21 +43,52 @@ class PCA9685(I2CDevice):
             if not self.bus.set_address(self.address):
                 return False
 
-            success, value = self.bus.read_byte_data(self.MODE1)
-            return success
+            try:
+                success, _ = self.bus.read_byte()
+                return success
+            except:
+                return False
 
         # 否则扫描可能的地址
         for addr in self.POSSIBLE_ADDRESSES:
             if not self.bus.set_address(addr):
                 continue
 
-            success, value = self.bus.read_byte_data(self.MODE1)
-            if success:
-                self.address = addr
-                print(f"检测到PCA9685设备: 0x{addr:02X}")
-                return True
+            try:
+                success, _ = self.bus.read_byte()
+                if success:
+                    self.address = addr
+                    print(f"检测到PCA9685设备: 0x{addr:02X}")
+                    return True
+            except:
+                continue
 
         return False
+
+    def initialize(self) -> bool:
+        """
+        初始化PCA9685
+
+        Returns:
+            bool: 是否成功初始化
+        """
+        if not self.bus or not self.address:
+            print("总线或地址未设置")
+            return False
+
+        try:
+            # 设置MODE1寄存器
+            if not self.bus.write_byte_data(self.MODE1, 0x00):
+                return False
+
+            # 关闭所有LED
+            if not self.set_all_pwm(0, 0):
+                return False
+
+            self.is_initialized = True
+            return True
+        except:
+            return False
 
     def set_pwm(self, channel: int, on: int, off: int) -> bool:
         """

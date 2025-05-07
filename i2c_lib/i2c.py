@@ -66,36 +66,38 @@ class I2CBase:
                 pass
             finally:
                 self.fd = -1
-    
+
+    # 修改 set_address 方法
     def set_address(self, address: int) -> bool:
         """
         设置I2C设备地址
-        
+
         Args:
             address: I2C设备地址
-            
+
         Returns:
             bool: 是否成功设置地址
         """
         if self.fd <= 0:
             print("设备未打开")
             return False
-        
+
         try:
+            # 使用 I2C_SLAVE_FORCE 替代 I2C_SLAVE
             fcntl.ioctl(self.fd, self.I2C_SLAVE_FORCE, address)
             self.address = address
             return True
         except OSError as e:
-            print(f"无法设置I2C地址 0x{address:02X}: {e}")
             return False
-    
+
+    # 修改错误处理相关的方法
     def write_byte(self, data: int) -> bool:
         """
         写入单个字节到I2C设备
-        
+
         Args:
             data: 要写入的字节
-            
+
         Returns:
             bool: 是否成功写入
         """
@@ -106,117 +108,111 @@ class I2CBase:
         try:
             os.write(self.fd, bytes([data]))
             return True
-        except OSError as e:
-            print(f"无法写入数据: {e}")
+        except OSError:
             return False
-    
+
     def read_byte(self) -> Tuple[bool, int]:
         """
         从I2C设备读取单个字节
-        
+
         Returns:
             Tuple[bool, int]: (是否成功, 读取的字节)
         """
         if self.fd <= 0:
             print("设备未打开")
             return False, 0
-        
+
         try:
             result = os.read(self.fd, 1)
             return True, result[0]
-        except OSError as e:
-            print(f"无法读取数据: {e}")
+        except OSError:
             return False, 0
-    
+
     def write_byte_data(self, reg: int, data: int) -> bool:
         """
         写入单个字节数据到指定寄存器
-        
+
         Args:
             reg: 寄存器地址
             data: 要写入的字节
-            
+
         Returns:
             bool: 是否成功写入
         """
         if self.fd <= 0:
             print("设备未打开")
             return False
-        
+
         try:
             msg = struct.pack('BB', reg, data)
             os.write(self.fd, msg)
             return True
-        except OSError as e:
-            print(f"无法写入数据到寄存器 0x{reg:02X}: {e}")
+        except OSError:
             return False
-    
+
     def read_byte_data(self, reg: int) -> Tuple[bool, int]:
         """
         从指定寄存器读取单个字节数据
-        
+
         Args:
             reg: 寄存器地址
-            
+
         Returns:
             Tuple[bool, int]: (是否成功, 读取的字节)
         """
         if self.fd <= 0:
             print("设备未打开")
             return False, 0
-        
+
         try:
             os.write(self.fd, bytes([reg]))
             result = os.read(self.fd, 1)
             return True, result[0]
-        except OSError as e:
-            print(f"无法从寄存器 0x{reg:02X} 读取数据: {e}")
+        except OSError:
             return False, 0
-    
+
     def write_block_data(self, reg: int, data: List[int]) -> bool:
         """
         写入数据块到指定寄存器
-        
+
         Args:
             reg: 寄存器地址
             data: 要写入的数据列表
-            
+
         Returns:
             bool: 是否成功写入
         """
         if self.fd <= 0:
             print("设备未打开")
             return False
-        
+
         try:
             msg = bytes([reg]) + bytes(data)
             os.write(self.fd, msg)
             return True
-        except OSError as e:
-            print(f"无法写入数据块到寄存器 0x{reg:02X}: {e}")
+        except OSError:
             return False
-    
+
     def read_block_data(self, reg: int, length: int) -> Tuple[bool, List[int]]:
         """
         从指定寄存器读取数据块
-        
+
         Args:
             reg: 寄存器地址
             length: 要读取的字节数
-            
+
         Returns:
             Tuple[bool, List[int]]: (是否成功, 读取的数据列表)
         """
         if self.fd <= 0:
             print("设备未打开")
             return False, []
-        
+
         try:
             os.write(self.fd, bytes([reg]))
             result = os.read(self.fd, length)
             return True, list(result)
-        except OSError as e:
-            print(f"无法从寄存器 0x{reg:02X} 读取数据块: {e}")
+        except OSError:
             return False, []
     
     @staticmethod

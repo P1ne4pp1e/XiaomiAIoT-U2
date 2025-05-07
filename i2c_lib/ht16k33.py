@@ -47,35 +47,6 @@ class HT16K33(I2CDevice):
         """
         super().__init__(bus, address)
 
-    def initialize(self) -> bool:
-        """
-        初始化HT16K33
-
-        Returns:
-            bool: 是否成功初始化
-        """
-        if not self.bus or not self.address:
-            print("总线或地址未设置")
-            return False
-
-        # 唤醒设备
-        if not self.bus.write_byte(self.CMD_STANDBY_MODE_DISABLE):
-            return False
-
-        # 设置ROW输出
-        if not self.bus.write_byte(self.CMD_ROW_OUTPUT):
-            return False
-
-        # 清空显示内容
-        self.clear()
-
-        # 启用显示
-        if not self.bus.write_byte(self.CMD_DISPLAY_ENABLE):
-            return False
-
-        self.is_initialized = True
-        return True
-
     def detect(self) -> bool:
         """
         检测HT16K33是否存在
@@ -92,23 +63,60 @@ class HT16K33(I2CDevice):
             if not self.bus.set_address(self.address):
                 return False
 
-            # 尝试读取一个字节
-            success, _ = self.bus.read_byte()
-            return success
+            try:
+                success, _ = self.bus.read_byte()
+                return success
+            except:
+                return False
 
         # 否则扫描可能的地址
         for addr in self.POSSIBLE_ADDRESSES:
             if not self.bus.set_address(addr):
                 continue
 
-            # 尝试读取一个字节
-            success, _ = self.bus.read_byte()
-            if success:
-                self.address = addr
-                print(f"检测到HT16K33设备: 0x{addr:02X}")
-                return True
+            try:
+                success, _ = self.bus.read_byte()
+                if success:
+                    self.address = addr
+                    print(f"检测到HT16K33设备: 0x{addr:02X}")
+                    return True
+            except:
+                continue
 
         return False
+
+    def initialize(self) -> bool:
+        """
+        初始化HT16K33
+
+        Returns:
+            bool: 是否成功初始化
+        """
+        if not self.bus or not self.address:
+            print("总线或地址未设置")
+            return False
+
+        try:
+            # 唤醒设备
+            if not self.bus.write_byte(self.CMD_STANDBY_MODE_DISABLE):
+                return False
+
+            # 设置ROW输出
+            if not self.bus.write_byte(self.CMD_ROW_OUTPUT):
+                return False
+
+            # 清空显示内容
+            if not self.clear():
+                return False
+
+            # 启用显示
+            if not self.bus.write_byte(self.CMD_DISPLAY_ENABLE):
+                return False
+
+            self.is_initialized = True
+            return True
+        except:
+            return False
 
     def clear(self) -> bool:
         """
@@ -211,27 +219,34 @@ class HT16K33(I2CDevice):
             print("设备未初始化")
             return False
 
-        # 清空显示内容
-        self.clear()
+        try:
+            # 清空显示内容
+            self.clear()
 
-        # 限制字符串长度
-        text = text[:4]
+            # 限制字符串长度
+            text = text[:4]
 
-        # 显示字符串
-        if align_right:
-            for i, char in enumerate(reversed(text)):
-                if i >= 4:
-                    break
-                if not self.display_char_right(i, char):
-                    return False
-        else:
-            for i, char in enumerate(text):
-                if i >= 4:
-                    break
-                if not self.display_char_left(i, char):
-                    return False
+            # 显示字符串
+            if align_right:
+                for i, char in enumerate(reversed(text)):
+                    if i >= 4:
+                        break
+                    if char not in self.TUBE_CHARS:
+                        continue
+                    if not self.display_char_right(i, char):
+                        return False
+            else:
+                for i, char in enumerate(text):
+                    if i >= 4:
+                        break
+                    if char not in self.TUBE_CHARS:
+                        continue
+                    if not self.display_char_left(i, char):
+                        return False
 
-        return True
+            return True
+        except:
+            return False
 
     def read_key(self) -> Tuple[bool, int]:
         """
