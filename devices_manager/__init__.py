@@ -1,0 +1,2 @@
+# devices_manager 模块初始化文件
+# 此文件确保devices_manager可以作为Python模块被导入
