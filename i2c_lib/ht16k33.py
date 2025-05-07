@@ -1,18 +1,14 @@
 from typing import *
-from i2c_lib.i2c import I2CBase, I2CDevice
+from i2c_lib.i2c import I2CBase
 
-class HT16K33(I2CDevice):
+class HT16K33:
     """HT16K33 LED控制器"""
-
-    # 命令定义
     CMD_STANDBY_MODE_ENABLE = 0x20
     CMD_STANDBY_MODE_DISABLE = 0x21
     CMD_DISPLAY_DISABLE = 0x80
     CMD_DISPLAY_ENABLE = 0x81
     CMD_ROW_OUTPUT = 0xA0
-    CMD_KEY_DATA_START = 0x40
 
-    # 可能的I2C地址
     POSSIBLE_ADDRESSES = [0x70, 0x71, 0x72, 0x73]
 
     # 数码管字符映射表
@@ -37,45 +33,35 @@ class HT16K33(I2CDevice):
         '_': {'reg1': 0x00, 'reg2': 0x00}
     }
 
-    def __init__(self, bus: I2CBase = None, address: int = None):
-        """
-        初始化HT16K33
-
-        Args:
-            bus: I2C总线对象
-            address: HT16K33的I2C地址
-        """
-        super().__init__(bus, address)
+    def __init__(self, i2c: I2CBase, address: int = None):
+        """初始化HT16K33"""
+        self.i2c = i2c
+        self.address = address
+        self.is_initialized = False
 
     def detect(self) -> bool:
-        """
-        检测HT16K33是否存在
-
-        Returns:
-            bool: 设备是否存在
-        """
-        if not self.bus:
-            print("总线未设置")
+        """检测HT16K33是否存在"""
+        if not self.i2c:
             return False
 
         # 如果已知地址，直接检测
         if self.address:
-            if not self.bus.set_address(self.address):
+            if not self.i2c.set_address(self.address):
                 return False
 
             try:
-                success, _ = self.bus.read_byte()
+                success, _ = self.i2c.read_byte()
                 return success
             except:
                 return False
 
         # 否则扫描可能的地址
         for addr in self.POSSIBLE_ADDRESSES:
-            if not self.bus.set_address(addr):
+            if not self.i2c.set_address(addr):
                 continue
 
             try:
-                success, _ = self.bus.read_byte()
+                success, _ = self.i2c.read_byte()
                 if success:
                     self.address = addr
                     print(f"检测到HT16K33设备: 0x{addr:02X}")
@@ -86,23 +72,17 @@ class HT16K33(I2CDevice):
         return False
 
     def initialize(self) -> bool:
-        """
-        初始化HT16K33
-
-        Returns:
-            bool: 是否成功初始化
-        """
-        if not self.bus or not self.address:
-            print("总线或地址未设置")
+        """初始化HT16K33"""
+        if not self.i2c or not self.address:
             return False
 
         try:
             # 唤醒设备
-            if not self.bus.write_byte(self.CMD_STANDBY_MODE_DISABLE):
+            if not self.i2c.write_byte(self.CMD_STANDBY_MODE_DISABLE):
                 return False
 
             # 设置ROW输出
-            if not self.bus.write_byte(self.CMD_ROW_OUTPUT):
+            if not self.i2c.write_byte(self.CMD_ROW_OUTPUT):
                 return False
 
             # 清空显示内容
@@ -110,7 +90,7 @@ class HT16K33(I2CDevice):
                 return False
 
             # 启用显示
-            if not self.bus.write_byte(self.CMD_DISPLAY_ENABLE):
+            if not self.i2c.write_byte(self.CMD_DISPLAY_ENABLE):
                 return False
 
             self.is_initialized = True
@@ -119,104 +99,70 @@ class HT16K33(I2CDevice):
             return False
 
     def clear(self) -> bool:
-        """
-        清空显示内容
+        """清空显示内容"""
+        try:
+            # 清空所有寄存器
+            for reg in range(0x02, 0x0A):
+                if not self.i2c.write_byte_data(reg, 0x00):
+                    return False
 
-        Returns:
-            bool: 是否成功清空
-        """
-        if not self.is_initialized:
-            print("设备未初始化")
+            return True
+        except:
             return False
-
-        # 清空所有寄存器
-        for reg in range(0x02, 0x0A):
-            if not self.bus.write_byte_data(reg, 0x00):
-                return False
-
-        return True
 
     def display_char_left(self, index: int, char: str) -> bool:
-        """
-        在指定位置显示字符（从左侧开始计数）
-
-        Args:
-            index: 位置索引 (0-3)
-            char: 要显示的字符
-
-        Returns:
-            bool: 是否成功显示
-        """
+        """在指定位置显示字符（从左侧开始计数）"""
         if not self.is_initialized:
-            print("设备未初始化")
             return False
 
         if index < 0 or index > 3:
-            print("位置索引无效")
             return False
 
         if char not in self.TUBE_CHARS:
-            print(f"不支持的字符: {char}")
             return False
 
-        # 计算寄存器地址
-        reg_base = 0x02 + index * 2
+        try:
+            # 计算寄存器地址
+            reg_base = 0x02 + index * 2
 
-        # 获取字符的寄存器值
-        reg1_val = self.TUBE_CHARS[char]['reg1']
-        reg2_val = self.TUBE_CHARS[char]['reg2']
+            # 获取字符的寄存器值
+            reg1_val = self.TUBE_CHARS[char]['reg1']
+            reg2_val = self.TUBE_CHARS[char]['reg2']
 
-        # 写入寄存器
-        return (self.bus.write_byte_data(reg_base, reg1_val) and
-                self.bus.write_byte_data(reg_base + 1, reg2_val))
+            # 写入寄存器
+            return (self.i2c.write_byte_data(reg_base, reg1_val) and
+                    self.i2c.write_byte_data(reg_base + 1, reg2_val))
+        except:
+            return False
 
     def display_char_right(self, index: int, char: str) -> bool:
-        """
-        在指定位置显示字符（从右侧开始计数）
-
-        Args:
-            index: 位置索引 (0-3)
-            char: 要显示的字符
-
-        Returns:
-            bool: 是否成功显示
-        """
+        """在指定位置显示字符（从右侧开始计数）"""
         if not self.is_initialized:
-            print("设备未初始化")
             return False
 
         if index < 0 or index > 3:
-            print("位置索引无效")
             return False
 
         if char not in self.TUBE_CHARS:
-            print(f"不支持的字符: {char}")
             return False
 
-        # 计算寄存器地址
-        reg_base = 0x08 - index * 2
+        try:
+            # 计算寄存器地址
+            reg_base = 0x08 - index * 2
 
-        # 获取字符的寄存器值
-        reg1_val = self.TUBE_CHARS[char]['reg1']
-        reg2_val = self.TUBE_CHARS[char]['reg2']
+            # 获取字符的寄存器值
+            reg1_val = self.TUBE_CHARS[char]['reg1']
+            reg2_val = self.TUBE_CHARS[char]['reg2']
 
-        # 写入寄存器
-        return (self.bus.write_byte_data(reg_base, reg1_val) and
-                self.bus.write_byte_data(reg_base + 1, reg2_val))
+            # 写入寄存器
+            return (self.i2c.write_byte_data(reg_base, reg1_val) and
+                    self.i2c.write_byte_data(reg_base + 1, reg2_val))
+        except:
+            return False
 
     def display_string(self, text: str, align_right: bool = True) -> bool:
-        """
-        显示字符串
-
-        Args:
-            text: 要显示的字符串
-            align_right: 是否右对齐
-
-        Returns:
-            bool: 是否成功显示
-        """
+        """显示字符串"""
         if not self.is_initialized:
-            print("设备未初始化")
             return False
 
         try:
@@ -247,6 +193,7 @@ class HT16K33(I2CDevice):
             return True
         except:
             return False
+
 
     def read_key(self) -> Tuple[bool, int]:
         """
